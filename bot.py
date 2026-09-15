@@ -1,3 +1,6 @@
+import os
+from threading import Thread
+from flask import Flask
 import telebot
 from telebot import types
 
@@ -8,9 +11,7 @@ ADMIN_ID = 6262854630
 CHANNEL_1 = "@ksp008h"
 CHANNEL_2 = "@abjllgt765"
 
-WELCOME_IMAGE_URL = (
-    "https://iili.io/ndFZlta.md.jpg"
-)
+WELCOME_IMAGE_URL = "https://iili.io/ndFZlta.md.jpg"
 ADMIN_USERNAME = "Helpbot655_bot"
 
 bot = telebot.TeleBot(TOKEN)
@@ -22,7 +23,7 @@ pending_refs = {}
 bot_settings = {
     "coins_per_rupee": 10,
     "min_withdrawal_coins": 50,
-    "referral_reward": 5
+    "referral_reward": 5,
 }
 
 tasks = [
@@ -40,7 +41,7 @@ tasks = [
         "link": "https://play.google.com/store/apps/details?id=example.app",
         "type": "app",
         "reward": 25,
-    }
+    },
 ]
 withdrawals = []
 app_submissions = []
@@ -63,9 +64,23 @@ def check_subscription(user_id):
 
 def get_join_markup():
   markup = types.InlineKeyboardMarkup()
-  markup.add(types.InlineKeyboardButton("📢 Join Channel 1", url=f"https://t.me/{CHANNEL_1.replace('@', '')}"))
-  markup.add(types.InlineKeyboardButton("📢 Join Channel 2", url=f"https://t.me/{CHANNEL_2.replace('@', '')}"))
-  markup.add(types.InlineKeyboardButton("🔄 Check Join / Verify", callback_data="check_join"))
+  markup.add(
+      types.InlineKeyboardButton(
+          "📢 Join Channel 1",
+          url=f"https://t.me/{CHANNEL_1.replace('@', '')}",
+      )
+  )
+  markup.add(
+      types.InlineKeyboardButton(
+          "📢 Join Channel 2",
+          url=f"https://t.me/{CHANNEL_2.replace('@', '')}",
+      )
+  )
+  markup.add(
+      types.InlineKeyboardButton(
+          "🔄 Check Join / Verify", callback_data="check_join"
+      )
+  )
   return markup
 
 
@@ -98,7 +113,8 @@ def start(message):
   if not check_subscription(user_id):
     bot.send_message(
         message.chat.id,
-        "❌ **Access Denied!**\n\nYou must join both of our official channels below to use this bot.",
+        "❌ **Access Denied!**\n\nYou must join both of our official channels"
+        " below to use this bot.",
         parse_mode="Markdown",
         reply_markup=get_join_markup(),
     )
@@ -143,10 +159,10 @@ def start(message):
     )
 
 
-@bot.message_handler(func=lambda message: True, content_types=['text', 'photo'])
+@bot.message_handler(func=lambda message: True, content_types=["text", "photo"])
 def handle_messages(message):
   user_id = message.from_user.id
-  
+
   if not check_subscription(user_id):
     bot.send_message(
         message.chat.id,
@@ -197,19 +213,21 @@ def handle_messages(message):
 
   # --- स्टेट्स (States) की जाँच ---
   state = user_state.get(user_id)
-  
+
   if state and state.startswith("WAITING_FOR_APP_PROOF_"):
     task_id = int(state.split("_")[-1])
     task = next((t for t in tasks if t["id"] == task_id), None)
-    
+
     if task:
       photo_file_id = None
       proof_text = message.text if message.text else ""
-      
+
       if message.photo:
         photo_file_id = message.photo[-1].file_id
-        proof_text = message.caption if message.caption else "Screenshot / Image Proof"
-      
+        proof_text = (
+            message.caption if message.caption else "Screenshot / Image Proof"
+        )
+
       if not proof_text and not photo_file_id:
         proof_text = "[Screenshot / Image Proof]"
 
@@ -220,13 +238,14 @@ def handle_messages(message):
           "reward": task["reward"],
           "proof": proof_text,
           "photo": photo_file_id,
-          "status": "Pending"
+          "status": "Pending",
       })
 
       user_state[user_id] = None
       bot.send_message(
           message.chat.id,
-          "✅ **Proof Submitted Successfully!**\nSent to admin for review. Coins will be added and task will be marked complete once approved.",
+          "✅ **Proof Submitted Successfully!**\nSent to admin for review. Coins"
+          " will be added and task will be marked complete once approved.",
           parse_mode="Markdown",
           reply_markup=get_main_keyboard(user_id),
       )
@@ -235,46 +254,59 @@ def handle_messages(message):
   # Admin Set Bot Settings Handling (Rate, Min Withdrawal & Referral Reward)
   if user_id == ADMIN_ID and user_state.get(user_id) == "WAITING_FOR_SETTINGS":
     try:
-      cleaned_text = text.replace('\u200b', '').replace('\u200e', '').replace('\u200f', '').strip()
+      cleaned_text = (
+          text.replace("\u200b", "")
+          .replace("\u200e", "")
+          .replace("\u200f", "")
+          .strip()
+      )
       parts = cleaned_text.split("|")
-      
+
       if len(parts) == 3:
         c_rate = int(parts[0].strip())
         min_w = int(parts[1].strip())
         ref_rew = int(parts[2].strip())
-        
+
         bot_settings["coins_per_rupee"] = c_rate
         bot_settings["min_withdrawal_coins"] = min_w
         bot_settings["referral_reward"] = ref_rew
         user_state[user_id] = None
-        
+
         bot.send_message(
             message.chat.id,
-            f"✅ **Settings Updated Successfully!**\n- Rate: `{c_rate} Coins = ₹1`\n- Min Withdrawal: `{min_w} Coins`\n- Referral Reward: `{ref_rew} Coins`",
+            f"✅ **Settings Updated Successfully!**\n- Rate: `{c_rate} Coins ="
+            f" ₹1`\n- Min Withdrawal: `{min_w} Coins`\n- Referral Reward:"
+            f" `{ref_rew} Coins`",
             parse_mode="Markdown",
             reply_markup=get_main_keyboard(user_id),
         )
       else:
         bot.send_message(
             message.chat.id,
-            "❌ Wrong format! Send like this:\n`Coins_Per_Rupee | Min_Withdrawal_Coins | Referral_Reward`\nExample: `10 | 50 | 5`",
+            "❌ Wrong format! Send like"
+            " this:\n`Coins_Per_Rupee | Min_Withdrawal_Coins |"
+            " Referral_Reward`\nExample: `10 | 50 | 5`",
             parse_mode="Markdown",
         )
     except Exception as e:
-      bot.send_message(message.chat.id, f"❌ Error: {e}\nPlease send in correct format like: `10 | 50 | 5`", parse_mode="Markdown")
+      bot.send_message(
+          message.chat.id,
+          f"❌ Error: {e}\nPlease send in correct format like: `10 | 50 | 5`",
+          parse_mode="Markdown",
+      )
     return
 
   # Admin Add Task handling
   if user_id == ADMIN_ID and user_state.get(user_id) == "WAITING_FOR_TASK":
     try:
-      cleaned_text = text.replace('\u200b', '').strip()
+      cleaned_text = text.replace("\u200b", "").strip()
       parts = cleaned_text.split("|")
       if len(parts) >= 4:
         title = parts[0].strip()
         link = parts[1].strip()
         reward = int(parts[2].strip())
         t_type = parts[3].strip().lower()
-        
+
         new_id = max([t["id"] for t in tasks], default=0) + 1
         new_task = {
             "id": new_id,
@@ -296,11 +328,9 @@ def handle_messages(message):
       else:
         bot.send_message(
             message.chat.id,
-            "❌ **Wrong format!**\n\n"
-            "📌 **For App / Website (Screenshot proof):**\n"
-            "`Title | Link | Reward | app`\n\n"
-            "📌 **For Channel (Auto verify):**\n"
-            "`Title | Link | Reward | channel | @channel_username`",
+            "❌ **Wrong format!**\n\n📌 **For App / Website (Screenshot"
+            " proof):**\n`Title | Link | Reward | app`\n\n📌 **For Channel (Auto"
+            " verify):**\n`Title | Link | Reward | channel | @channel_username`",
             parse_mode="Markdown",
         )
     except Exception as e:
@@ -313,11 +343,13 @@ def handle_messages(message):
 
     bal = users[user_id]["balance"]
     min_w = bot_settings["min_withdrawal_coins"]
-    
+
     if bal < min_w:
       bot.send_message(
           message.chat.id,
-          f"❌ **Withdrawal Failed!**\nYour balance is **{bal} Coins**, but the minimum withdrawal limit is **{min_w} Coins**. Earn more coins to withdraw!",
+          f"❌ **Withdrawal Failed!**\nYour balance is **{bal} Coins**, but the"
+          f" minimum withdrawal limit is **{min_w} Coins**. Earn more coins to"
+          " withdraw!",
           parse_mode="Markdown",
           reply_markup=get_main_keyboard(user_id),
       )
@@ -355,7 +387,8 @@ def handle_messages(message):
     rupees = bal / rate
     bot.send_message(
         message.chat.id,
-        f"💳 Your current balance:\n- Coins: **{bal}**\n- Value: **₹{rupees:.2f}**",
+        f"💳 Your current balance:\n- Coins: **{bal}**\n- Value:"
+        f" **₹{rupees:.2f}**",
         parse_mode="Markdown",
     )
 
@@ -365,7 +398,8 @@ def handle_messages(message):
     ref_rew = bot_settings["referral_reward"]
     bot.send_message(
         message.chat.id,
-        f"🔗 Your referral link:\n`{link}`\n\nShare and get **{ref_rew} coins** per referral!",
+        f"🔗 Your referral link:\n`{link}`\n\nShare and get **{ref_rew} coins**"
+        " per referral!",
         parse_mode="Markdown",
     )
 
@@ -376,7 +410,7 @@ def handle_messages(message):
 
     markup = types.InlineKeyboardMarkup()
     user_completed = users[user_id].get("completed_tasks", [])
-    
+
     available_found = False
     for t in tasks:
       if t["id"] not in user_completed:
@@ -389,7 +423,11 @@ def handle_messages(message):
         available_found = True
 
     if not available_found:
-      bot.send_message(message.chat.id, "🎉 You have completed all available tasks! New tasks will appear here soon.")
+      bot.send_message(
+          message.chat.id,
+          "🎉 You have completed all available tasks! New tasks will appear"
+          " here soon.",
+      )
     else:
       bot.send_message(
           message.chat.id,
@@ -403,18 +441,22 @@ def handle_messages(message):
     rate = bot_settings["coins_per_rupee"]
     min_rs = min_w / rate
     bal = users[user_id]["balance"]
-    
+
     if bal < min_w:
       bot.send_message(
           message.chat.id,
-          f"❌ **Insufficient Balance!**\n- Your Balance: `{bal} Coins`\n- Min Limit Required: `{min_w} Coins` (₹{min_rs})\n\nYou need `{min_w - bal}` more coins to withdraw.",
+          f"❌ **Insufficient Balance!**\n- Your Balance: `{bal} Coins`\n- Min"
+          f" Limit Required: `{min_w} Coins` (₹{min_rs})\n\nYou need"
+          f" `{min_w - bal}` more coins to withdraw.",
           parse_mode="Markdown",
       )
       return
 
     bot.send_message(
         message.chat.id,
-        f"📌 **Withdrawal Info:**\n- Min Limit: `{min_w} Coins` (₹{min_rs})\n- Rate: `{rate} Coins = ₹1`\n\nPlease send your UPI ID or Paytm Number (e.g., `user@upi`):",
+        f"📌 **Withdrawal Info:**\n- Min Limit: `{min_w} Coins` (₹{min_rs})\n-"
+        f" Rate: `{rate} Coins = ₹1`\n\nPlease send your UPI ID or Paytm Number"
+        " (e.g., `user@upi`):",
         parse_mode="Markdown",
     )
     user_state[user_id] = "WAITING_FOR_UPI"
@@ -426,7 +468,11 @@ def handle_messages(message):
     current_ref = bot_settings["referral_reward"]
     bot.send_message(
         message.chat.id,
-        f"⚙️ **Current Settings:**\n- Rate: `{current_rate} Coins = ₹1`\n- Min Withdrawal: `{current_min} Coins`\n- Referral Reward: `{current_ref} Coins`\n\nSend new settings in this exact format:\n`Coins_Per_Rupee | Min_Withdrawal_Coins | Referral_Reward`\nExample: `10 | 50 | 5`",
+        f"⚙️ **Current Settings:**\n- Rate: `{current_rate} Coins ="
+        f" ₹1`\n- Min Withdrawal: `{current_min} Coins`\n- Referral Reward:"
+        f" `{current_ref} Coins`\n\nSend new settings in this exact"
+        " format:\n`Coins_Per_Rupee | Min_Withdrawal_Coins |"
+        " Referral_Reward`\nExample: `10 | 50 | 5`",
         parse_mode="Markdown",
     )
 
@@ -434,12 +480,10 @@ def handle_messages(message):
     user_state[user_id] = "WAITING_FOR_TASK"
     bot.send_message(
         message.chat.id,
-        "➕ **Add New Task**\n\n"
-        "Send details in format based on task type:\n\n"
-        "1️⃣ **For App/Website (Screenshot proof):**\n"
-        "`Title | Link | Reward | app`\n\n"
-        "2️⃣ **For Channel (Auto join verify):**\n"
-        "`Title | Link | Reward | channel | @channel_username`",
+        "➕ **Add New Task**\n\nSend details in format based on task"
+        " type:\n\n1️⃣ **For App/Website (Screenshot proof):**\n`Title | Link |"
+        " Reward | app`\n\n2️⃣ **For Channel (Auto join verify):**\n`Title | Link"
+        " | Reward | channel | @channel_username`",
         parse_mode="Markdown",
     )
 
@@ -451,7 +495,8 @@ def handle_messages(message):
     for t in tasks:
       markup.add(
           types.InlineKeyboardButton(
-              f"❌ Delete: {t['title']} ({t['type']})", callback_data=f"del_task_{t['id']}"
+              f"❌ Delete: {t['title']} ({t['type']})",
+              callback_data=f"del_task_{t['id']}",
           )
       )
     bot.send_message(
@@ -474,17 +519,20 @@ def handle_messages(message):
               "✅ Pay / Approve", callback_data=f"pay_app_{req['user_id']}"
           )
       )
-      rupees = req['amount'] / rate
+      rupees = req["amount"] / rate
       bot.send_message(
           message.chat.id,
           f"💳 **Payment Request #{i+1}**\n- User ID: `{req['user_id']}`\n- UPI:"
-          f" `{req['upi']}`\n- Amount: `{req['amount']}` Coins (**₹{rupees:.2f}**)",
+          f" `{req['upi']}`\n- Amount: `{req['amount']}` Coins"
+          f" (**₹{rupees:.2f}**)",
           parse_mode="Markdown",
           reply_markup=markup,
       )
 
   elif user_id == ADMIN_ID and text == "📱 App Task Requests":
-    pending_app_reqs = [sub for sub in app_submissions if sub["status"] == "Pending"]
+    pending_app_reqs = [
+        sub for sub in app_submissions if sub["status"] == "Pending"
+    ]
     if not pending_app_reqs:
       bot.send_message(message.chat.id, "There are no pending app task proofs.")
       return
@@ -493,23 +541,23 @@ def handle_messages(message):
       markup = types.InlineKeyboardMarkup()
       markup.add(
           types.InlineKeyboardButton(
-              "✅ Approve & Give Reward", callback_data=f"app_app_{sub['user_id']}_{sub['task_id']}"
+              "✅ Approve & Give Reward",
+              callback_data=f"app_app_{sub['user_id']}_{sub['task_id']}",
           )
       )
       caption_msg = (
-          f"📱 **App Task Proof #{i+1}**\n"
-          f"- User ID: `{sub['user_id']}`\n"
-          f"- Task: {sub['task_title']}\n"
-          f"- Proof: {sub['proof']}"
+          f"📱 **App Task Proof #{i+1}**\n- User ID:"
+          f" `{sub['user_id']}`\n- Task: {sub['task_title']}\n- Proof:"
+          f" {sub['proof']}"
       )
-      
+
       if sub.get("photo"):
         bot.send_photo(
             message.chat.id,
             photo=sub["photo"],
             caption=caption_msg,
             parse_mode="Markdown",
-            reply_markup=markup
+            reply_markup=markup,
         )
       else:
         bot.send_message(
@@ -527,7 +575,9 @@ def callback_handler(call):
 
   if call.data == "check_join":
     if check_subscription(user_id):
-      bot.answer_callback_query(call.id, "✅ Thank you for joining both channels!")
+      bot.answer_callback_query(
+          call.id, "✅ Thank you for joining both channels!"
+      )
       if user_id not in users:
         users[user_id] = {
             "balance": 0,
@@ -552,45 +602,64 @@ def callback_handler(call):
       )
     else:
       bot.answer_callback_query(
-          call.id, "❌ You have not joined both channels yet!", show_alert=True
+          call.id,
+          "❌ You have not joined both channels yet!",
+          show_alert=True,
       )
     return
 
   if not check_subscription(user_id):
-    bot.answer_callback_query(call.id, "Please join both channels first!", show_alert=True)
+    bot.answer_callback_query(
+        call.id, "Please join both channels first!", show_alert=True
+    )
     return
 
   if call.data.startswith("task_") and not call.data.startswith("task_verify_"):
     task_id = int(call.data.split("_")[1])
     task = next((t for t in tasks if t["id"] == task_id), None)
-    
+
     if not task:
       bot.answer_callback_query(call.id, "Task not found!")
       return
 
     if task_id in users[user_id]["completed_tasks"]:
-      bot.answer_callback_query(call.id, "You have already completed this task!", show_alert=True)
+      bot.answer_callback_query(
+          call.id, "You have already completed this task!", show_alert=True
+      )
       return
 
     if task.get("type") == "app":
       user_state[user_id] = f"WAITING_FOR_APP_PROOF_{task_id}"
       markup = types.InlineKeyboardMarkup()
-      markup.add(types.InlineKeyboardButton("📥 Open Link / Visit Website", url=task["link"]))
+      markup.add(
+          types.InlineKeyboardButton(
+              "📥 Open Link / Visit Website", url=task["link"]
+          )
+      )
       bot.send_message(
           call.message.chat.id,
-          f"📱 **{task['title']}**\n\n1. Click the button above to visit the link/app.\n2. Complete the task and send your **screenshot or registered proof** right here in the chat.",
+          f"📱 **{task['title']}**\n\n1. Click the button above to visit the"
+          " link/app.\n2. Complete the task and send your **screenshot or"
+          " registered proof** right here in the chat.",
           parse_mode="Markdown",
           reply_markup=markup,
       )
       bot.answer_callback_query(call.id)
     else:
       markup = types.InlineKeyboardMarkup()
-      markup.add(types.InlineKeyboardButton("🔗 Open Channel", url=task["link"]))
-      markup.add(types.InlineKeyboardButton("✅ Verify & Claim Reward", callback_data=f"task_verify_{task_id}"))
-      
+      markup.add(
+          types.InlineKeyboardButton("🔗 Open Channel", url=task["link"])
+      )
+      markup.add(
+          types.InlineKeyboardButton(
+              "✅ Verify & Claim Reward", callback_data=f"task_verify_{task_id}"
+          )
+      )
+
       bot.send_message(
           call.message.chat.id,
-          f"📌 **{task['title']}**\n\n1. Join this specific channel using the link.\n2. Click **'Verify & Claim Reward'** below.",
+          f"📌 **{task['title']}**\n\n1. Join this specific channel using the"
+          " link.\n2. Click **'Verify & Claim Reward'** below.",
           parse_mode="Markdown",
           reply_markup=markup,
       )
@@ -606,7 +675,9 @@ def callback_handler(call):
       return
 
     if task_id in users[user_id]["completed_tasks"]:
-      bot.answer_callback_query(call.id, "You have already claimed this task!", show_alert=True)
+      bot.answer_callback_query(
+          call.id, "You have already claimed this task!", show_alert=True
+      )
       return
 
     try:
@@ -619,17 +690,23 @@ def callback_handler(call):
         bot.answer_callback_query(call.id, "Success! Reward added.")
         bot.send_message(
             call.message.chat.id,
-            f"✅ **Task Verified Successfully!**\nYou received +{task['reward']} coins.",
+            f"✅ **Task Verified Successfully!**\nYou received +{task['reward']}"
+            " coins.",
             parse_mode="Markdown",
         )
       else:
         bot.answer_callback_query(
-            call.id, "❌ You have not joined this task's channel yet!", show_alert=True
+            call.id,
+            "❌ You have not joined this task's channel yet!",
+            show_alert=True,
         )
     except Exception as e:
       print(f"Task verification error: {e}")
       bot.answer_callback_query(
-          call.id, "❌ Error verifying membership. Make sure bot is admin in that task channel!", show_alert=True
+          call.id,
+          "❌ Error verifying membership. Make sure bot is admin in that task"
+          " channel!",
+          show_alert=True,
       )
     return
 
@@ -639,7 +716,11 @@ def callback_handler(call):
     target_tid = int(parts[3])
 
     for sub in app_submissions:
-      if sub["user_id"] == target_uid and sub["task_id"] == target_tid and sub["status"] == "Pending":
+      if (
+          sub["user_id"] == target_uid
+          and sub["task_id"] == target_tid
+          and sub["status"] == "Pending"
+      ):
         sub["status"] = "Approved"
         if target_uid in users:
           users[target_uid]["balance"] += sub["reward"]
@@ -649,12 +730,14 @@ def callback_handler(call):
         bot.answer_callback_query(call.id, "App proof approved!")
         bot.send_message(
             call.message.chat.id,
-            f"✅ App task proof for user `{target_uid}` approved and reward credited.",
+            f"✅ App task proof for user `{target_uid}` approved and reward"
+            " credited.",
             parse_mode="Markdown",
         )
         bot.send_message(
             target_uid,
-            f"🎉 Your proof for **{sub['task_title']}** was approved by admin! +{sub['reward']} coins added.",
+            f"🎉 Your proof for **{sub['task_title']}** was approved by admin!"
+            f" +{sub['reward']} coins added.",
             parse_mode="Markdown",
         )
         break
@@ -683,5 +766,25 @@ def callback_handler(call):
         break
 
 
-bot.infinity_polling()
+# --- Render के लिए Flask सर्वर और बोट को एक साथ चलाना ---
+app = Flask("")
 
+
+@app.route("/")
+def home():
+  return "Bot is running and active!"
+
+
+def run_flask():
+  port = int(os.environ.get("PORT", 8080))
+  app.run(host="0.0.0.0", port=port)
+
+
+if __name__ == "__main__":
+  # बैकग्राउंड में Flask सर्वर शुरू करें
+  server_thread = Thread(target=run_flask)
+  server_thread.start()
+
+  print("Bot is starting with polling...")
+  # टेलीग्राम बोट पोलिंग शुरू करें
+  bot.infinity_polling()
